@@ -220,6 +220,9 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
     //     (let ((b a)) (print a) (+ a b)))
     var binds = x.cdr.car, body = x.cdr.cdr;
 
+    if(binds === nil)
+      return new Pair(Sym("let"), new Pair(nil, body));
+
     if(!(binds instanceof Pair))
       throw new Error("let*: need a pair for bindings: got "+to_write(binds));
 
@@ -348,8 +351,7 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
   //
   //"procedure?", 1, 1
   define_libfunc("procedure?", 1, 1, function(ar){
-    return ((ar[0] instanceof Array) && (ar[0].closure_p === true)
-	    || (typeof ar[0] == "function"));
+    return BiwaScheme.isProcedure(ar[0]);
   })
 
   //
@@ -658,7 +660,7 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
 
     if(base){ // log b num == log e num / log e b
       assert_number(base);
-      return Math.log(num) / Math.log(b)
+      return Math.log(num) / Math.log(base)
     }
     else
       return Math.log(num);
@@ -754,17 +756,40 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
     return z.toString(radix);
   })
   define_libfunc("string->number", 1, 3, function(ar){
-    var s = ar[0], radix = ar[1] || 10;
-    switch(s){
-      case "+inf.0": return Infinity;
-      case "-inf.0": return -Infinity;
-      case "+nan.0": return NaN;
-      default:       if(s.match(/[eE.]/))
-                       return parseFloat(s);
-                     else
-                       return parseInt(s, radix);
+    var s = ar[0];
 
-    }
+    if (s === '+inf.0')
+      return Infinity;
+
+    if (s === '-inf.0')
+      return -Infinity;
+
+    if (s === '+nan.0')
+      return NaN;
+
+    var radix = ar[1];
+    
+    var int_res = BiwaScheme.parse_integer(
+      s, radix === 0 ? 0 : radix || 10
+    );
+
+    if (int_res !== false)
+      return int_res;
+
+    if (radix !== undefined && radix !== 10)
+      return false;
+
+    var fp_res = BiwaScheme.parse_float(s);
+
+    if (fp_res !== false)
+      return fp_res;
+
+    var frac_res = BiwaScheme.parse_fraction(s);
+
+    if (frac_res !== false)
+      return frac_res;
+
+    return false;
   })
 
   //
@@ -880,8 +905,8 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
       n++;
     return n;
   });
-  define_libfunc("append", 2, null, function(ar){
-    var k = ar.length
+  define_libfunc("append", 1, null, function(ar){
+    var k = ar.length;
     var ret = ar[--k];
     while(k--){
       _.each(ar[k].to_array().reverse(), function(item){
@@ -1041,7 +1066,8 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
     _.times(ar[0], function() { out += c; });
     return out;
   })
-  define_libfunc("string", 1, null, function(ar){
+  define_libfunc("string", 0, null, function(ar){
+    if(ar.length == 0) return "";
     for(var i=0; i<ar.length; i++)
       assert_char(ar[i]);
     return _.map(ar, function(c){ return c.value }).join("");
@@ -1144,7 +1170,7 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
   //        11.13  Vectors
   //
   define_libfunc("vector?", 1, 1, function(ar){
-    return (ar[0] instanceof Array) && (ar[0].closure_p !== true)
+    return BiwaScheme.isVector(ar[0]);
   })
   define_libfunc("make-vector", 1, 2, function(ar){
     assert_integer(ar[0]);
@@ -1156,7 +1182,7 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
     }
     return vec;
   })
-  define_libfunc("vector", 1, null, function(ar){
+  define_libfunc("vector", 0, null, function(ar){
     return ar;
   })
   define_libfunc("vector-length", 1, 1, function(ar){
@@ -1264,7 +1290,8 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
   //named let
 
   //        11.17  Quasiquotation
-  //quasiquote
+  // `() is expanded to `cons` and `append`.
+  // `#() is expanded to `vector` and `vector-append`.
   var expand_qq = function(f, lv){
     if(f instanceof Symbol || f === nil){
       return List(Sym("quote"), f);
@@ -1272,28 +1299,28 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
     else if(f instanceof Pair){
       var car = f.car;
       if(car instanceof Pair && car.car === Sym("unquote-splicing")){
-        var lv = lv-1;
-        if(lv == 0)
+        if(lv == 1)
           return List(Sym("append"),
                       f.car.cdr.car,
-                      expand_qq(f.cdr, lv+1));
+                      expand_qq(f.cdr, lv));
         else
           return List(Sym("cons"),
-                      List(Sym("list"), Sym("unquote-splicing"), expand_qq(f.car.cdr.car, lv)),
-                      expand_qq(f.cdr, lv+1));
+                      List(Sym("list"),
+                           List(Sym("quote"), Sym("unquote-splicing")),
+                           expand_qq(f.car.cdr.car, lv-1)),
+                      expand_qq(f.cdr, lv));
       }
       else if(car === Sym("unquote")){
-        var lv = lv-1;
-        if(lv == 0)
+        if(lv == 1)
           return f.cdr.car;
         else
           return List(Sym("list"),
                       List(Sym("quote"), Sym("unquote")),
-                      expand_qq(f.cdr.car, lv));
+                      expand_qq(f.cdr.car, lv-1));
       }
       else if(car === Sym("quasiquote"))
         return List(Sym("list"),
-                    Sym("quasiquote"),
+                    List(Sym("quote"), Sym("quasiquote")),
                     expand_qq(f.cdr.car, lv+1));
       else
         return List(Sym("cons"),
@@ -1301,48 +1328,48 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
                     expand_qq(f.cdr, lv));
     }
     else if(f instanceof Array){
-      throw new Bug("vector quasiquotation is not implemented yet");
+      var vecs = [[]];
+      for(var i=0; i<f.length; i++){
+        if(f[i] instanceof Pair && f[i].car === Sym("unquote-splicing")) {
+          if (lv == 1) {
+            var item = List(Sym("list->vector"), f[i].cdr.car);
+            item["splicing"] = true;
+            vecs.push(item);
+            vecs.push([]);
+          }
+          else {
+            var item = List(Sym("cons"),
+                         List(Sym("list"),
+                              List(Sym("quote"), Sym("unquote-splicing")),
+                              expand_qq(f[i].car.cdr.car, lv-1)),
+                         expand_qq(f[i].cdr, lv));
+            _.last(vecs).push(item);
+          }
+        }
+        else {
+          // Expand other things as the same as if they are in a list quasiquote
+          _.last(vecs).push(expand_qq(f[i], lv));
+        }
+      }
+
+      var vectors = vecs.map(function(vec){
+        if (vec["splicing"]) {
+          return vec;
+        }
+        else {
+          return Cons(Sym("vector"),
+                      BiwaScheme.array_to_list(vec));
+        }
+      });
+      if (vectors.length == 1) {
+         return Cons(Sym("vector"),
+                     BiwaScheme.array_to_list(vecs[0]));
+      }
+      else {
+        return Cons(Sym("vector-append"),
+                    BiwaScheme.array_to_list(vectors));
+      }
     }
-//      // `#(1 2 (unquote f))
-//      // (vector 1 2 f)
-//      // `#(1 2 (unquote-splicing f) 3)
-//      // (vector-append
-//      //   (vector 1 2)
-//      //   f
-//      //   (vector 3))
-//      // `#(1 2 `#(3 ,,f) 4)
-//      // (vector 1 2 `#(3 ,g) 4)
-//      var len = f.length;
-//      if(len == 0) return f;
-//
-//      var vecs = [[]];
-//      for(var i=0; i<len; i++){
-//        if(f[i] instanceof Pair){
-//          if(f[i].car === Sym("unquote")){
-//            var lv = lv - 1;
-//            if(lv == 0)
-//              vecs.last().push(f[i]);
-//            else
-//              vecs.push()
-//          }
-//      }
-//
-//      var car = f[0];
-//      if(car === Sym("unquote")){
-//        var lv = lv - 1;
-//        if(lv == 0)
-//          return f.cdr.car;
-//        else
-//          return List(Sym("vector"),
-//                      List(Sym("quote"), Sym("unquote")),
-//                      expand_qq(f.cdr.car, lv));
-//      }
-//      else{
-////        return [ Sym("vector"),
-////                 expand_qq(
-//      }
-//    }
-//  }
     else
       return f;
   }
@@ -2623,7 +2650,7 @@ if( typeof(BiwaScheme)!='object' ) BiwaScheme={}; with(BiwaScheme) {
     assert_port(port);
 
     return port.get_string(function(str){
-	    return Interpreter.read(str);
+      return Interpreter.read(str); 
     });
   })
 

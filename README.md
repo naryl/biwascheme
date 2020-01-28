@@ -15,7 +15,9 @@ see [http://www.biwascheme.org/](http://www.biwascheme.org/)
 Download
 ========
 
-* http://www.biwascheme.org/release/biwascheme-min.js (release version)
+* http://www.biwascheme.org/
+
+(Or you can just copy the file from [`./release`](release/).)
 
 How to use
 ==========
@@ -25,13 +27,13 @@ Just load biwascheme.js (or biwascheme-min.js) and write Scheme code.
     <!DOCTYPE html>
     <html>
     <body>
-    
+
     <div id="bs-console"></div>
-    
+
     <script src="biwascheme.js">
     (display "hello, world!")
     </script>
-    
+
     </body>
     </html>
 
@@ -62,8 +64,13 @@ How to use from inside node.js as a module
 Files
 =====
 
-Source code:
-
+* release/
+  + the following files are generated here with $ make
+    - biwascheme.js
+    - biwascheme-min.js
+    - node_biwascheme.js
+* demo/
+  + Demos
 * src/
   + deps/
      - Dependencies (jQuery, underscore)
@@ -81,21 +88,9 @@ Source code:
   + Unit tests
 * tuplespace/
   + (experimental) TupleSpace implemented in Scheme
-* FILES.json(.ejs)
-* Makefile
-
-Files for npm package:
-
-* bin/biwas
-* package.json
-
-Docs:
-
-* CHANGELOG.md
-* doc
-* website/
+* web/
   + HTMLs and CSS of www.biwascheme.org
-* local_website.js
+* www.biwascheme.org.js
   + web server
 
 Building biwascheme.js
@@ -105,12 +100,11 @@ Prerequisites:
 
 * make
 * sed
-* Node.js (tested with 7.4.0)
+* node, npm, npx (Node.js)
 
-To build release/*.js:
+Make compiles src/\*.js into release/biwascheme.js.
 
     $ npm install
-    $ ./bootstrap.sh
     $ make
 
 Links
@@ -127,9 +121,8 @@ Development memos
 How to add a new file
 ---------------------
 
-* edit FILES.json.ejs
-* `$ ./bootstrap.sh`
-* `$ make`
+* edit Makefile
+* edit src/development_loader.js
 
 How to release
 --------------
@@ -153,13 +146,14 @@ underscore.string:
 Website
 -------
 
-(moved to doc/dev/website.md)
+The source of www.biwascheme.org is in `./website`.
 
 ### Run local website
 
 You can run the website locally with Node and express.
 
     $ make
+    $ make website
     $ npm install
     $ node local_website.js
     $ open http://localhost:7001

@@ -1,6 +1,6 @@
 ## How to make a release
 
-1. Edit CHANGELOG.md
+1. Edit History.txt
 1. Edit VERSION
 1. Edit package.json
 1. Build
@@ -28,9 +28,7 @@
 1. Create biwascheme-x.y.z.js
   - $ cp release/biwascheme{,-x.y.z}js
   - $ cp release/biwascheme{,-x.y.z}-min.js
-1. Push changes and make a release on github
-  - Copy changelog from CHANGELOG.md
-  - Press the "Publish" button to make a git tag
+1. Commit, `git tag` and push changes to github
 1. Update website
   - see website.md
 1. Publish npm package

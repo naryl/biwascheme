@@ -85,12 +85,13 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
   //s: depth of stack to save
   //n: number of args(for outer lambda) to remove (= 0 unless tail position)
   //ret: closure array
-  continuation: function(s, n){
+  capture_continuation: function(s, n){
     // note: implementation of this function for final version doesn't exist in 3imp.pdf..
     var ss = this.push(n, s);
     return this.closure(["refer-local", 0,
                           ["nuate", this.save_stack(ss), 
                           ["return"]]], 
+                        1,     //arity
                         0,     //n (number of frees)
                         null,  //s (stack position to get frees)
                         -1);   // dotpos
@@ -102,32 +103,34 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
   // m: number of items to shift
   // s: stack pointer (= index of stack top + 1)
   shift_args: function(n, m, s){
-    for(var i = n-1; i >= -1; i--){
+    for(var i = n; i >= 0; i--){
       this.index_set(s, i+m+1, this.index(s, i));
     }
     return s-m-1;
   },
 
   index: function(s, i){
-    return this.stack[s-i-2];
+    return this.stack[(s-1)-i];
   },
 
   // private
   index_set: function(s, i, v){
-    this.stack[s-i-2] = v;
+    this.stack[(s-1)-i] = v;
   },
 
   // private
   //ret: [body, stack[s-1], stack[s-2], .., stack[s-n], dotpos]
-  closure: function(body, n, s, dotpos){
+  closure: function(body, args, n, s, dotpos){
     var v = []; //(make-vector n+1+1)
     v[0] = body;
     for(var i=0; i<n; i++)
-      v[i+1] = this.index(s, i-1);
+      v[i+1] = this.index(s, i);
     v[n+1] = dotpos;
 
-    v.closure_p = true;
+    if(dotpos == -1)
+      v.expected_args = args;
 
+    BiwaScheme.makeClosure(v);
     return v;
   },
 
@@ -171,7 +174,7 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
         return a;
       case "refer-local":
         var n=x[1], x=x[2];
-        a = this.index(f, n);
+        a = this.index(f, n+1);
         this.last_refer = "(anon)";
         break;
       case "refer-free":
@@ -202,13 +205,13 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
         break;
       case "close":
         var ox=x;
-        var n=ox[1], body=ox[2], x=ox[3], dotpos=ox[4];
-        a = this.closure(body, n, s, dotpos);
+        var v=ox[1], n=ox[2], body=ox[3], x=ox[4], dotpos=ox[5];
+        a = this.closure(body, v, n, s, dotpos);
         s -= n;
         break;
       case "box":
         var n=x[1], x=x[2];
-        this.index_set(s, n, [this.index(s, n)]); //boxing
+        this.index_set(s, n+1, [this.index(s, n+1)]); //boxing
         break;
       case "test":
         var thenc=x[1], elsec=x[2];
@@ -230,7 +233,7 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
         break;
       case "assign-local":
         var n=x[1], x=x[2];
-        var box = this.index(f, n);
+        var box = this.index(f, n+1);
         box[0] = a;
         a = BiwaScheme.undef;
         break;
@@ -242,7 +245,7 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
         break;
       case "conti":
         var n=x[1], x=x[2];
-        a = this.continuation(s, n);
+        a = this.capture_continuation(s, n);
         break;
       case "nuate":
         var stack=x[1], x=x[2];
@@ -262,7 +265,7 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
         var n=x[1], x=x[2];
 
         // the number of arguments in the last call
-        var n_args = this.index(s, n);  
+        var n_args = this.index(s, n+1);  
 
         s = this.shift_args(n, n_args, s);
         break;
@@ -285,8 +288,8 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
 
         // the number of arguments in the last call is
         // pushed to the stack.
-        var n_args = this.index(s, -1);
-        if(func instanceof Array){ //closure
+        var n_args = this.index(s, 0);
+        if(BiwaScheme.isClosure(func)){
           a = func;
           x = func[0];
 
@@ -299,7 +302,7 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
             // => Process the &rest args: packing the rest args into a list.
             var ls = BiwaScheme.nil;
             for (var i=n_args; --i>=dotpos; ) {
-              ls = new BiwaScheme.Pair(this.index(s, i), ls);
+              ls = new BiwaScheme.Pair(this.index(s, i+1), ls);
             }
             if (dotpos >= n_args) {
               // No rest argument is passed to this closure.
@@ -307,14 +310,24 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
               // In such case this VM prepares an empty list as the rest argument.
               // --------------------------------------------------------------
               // => We extend the stack to put the empty list.
-              for(var i = -1; i < n_args; i++){
+              for(var i = 0; i < n_args+1; i++){
                 this.index_set(s, i-1, this.index(s, i));
               }
               s++;
               // => Update the number of arguments
-              this.index_set(s, -1, this.index(s, -1) + 1);  
+              this.index_set(s, 0, this.index(s, 0) + 1);  
             }
-            this.index_set(s, dotpos, ls);
+            this.index_set(s, dotpos+1, ls);
+          }
+          else {
+            // the dot is not found
+            // --------------------
+            // => Verify that number of arguments = expected number of arguments
+            // (if the closure knows how many it wants)
+            if(func.expected_args && n_args != func.expected_args) {
+              var errMsg = "Function call error: got " + n_args + " but wanted " + func.expected_args;
+              throw new BiwaScheme.Error(errMsg);
+            }
           }
           f = s;
           c = a;
@@ -323,7 +336,7 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
           // load arguments from stack
           var args = [];
           for(var i=0; i<n_args; i++) 
-            args.push(this.index(s, i));
+            args.push(this.index(s, i+1));
 
           // invoke the function
           var result = func(args, this);
@@ -381,11 +394,11 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
         break;
       case "return":
         // Pop stack frame
-        var n=this.index(s, -1);
+        var n=this.index(s, 0);
         var ss=s-n;
-        x = this.index(ss, 0),
-        f = this.index(ss, 1),
-        c = this.index(ss, 2),
+        x = this.index(ss, 1),
+        f = this.index(ss, 2),
+        c = this.index(ss, 3),
         s = ss-3-1;
 
         // Pop stack trace (> 1 times if tail calls are done)
@@ -407,6 +420,7 @@ BiwaScheme.Interpreter = BiwaScheme.Class.create({
 
   // Compile and evaluate Scheme program
   evaluate: function(str, after_evaluate){
+    this.call_stack = [];
     this.parser = new BiwaScheme.Parser(str);
     this.compiler = new BiwaScheme.Compiler();
     if(after_evaluate) 

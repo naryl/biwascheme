@@ -1,10 +1,10 @@
 {
     "name": "biwascheme",
     "description": "A practical Scheme interpreter written in JavaScript",
-    "version": "0.6.7",
+    "version": "0.6.9",
     "author": "Yutaka HARA <yutaka.hara.gmail.com>",
     "license": "MIT",
-    "homepage": "http://www.biwascheme.org/",
+    "homepage": "https://www.biwascheme.org/",
     "keywords": [
         "scheme",
         "lisp",
@@ -17,59 +17,25 @@
         "url": "git://github.com/biwascheme/biwascheme.git"
     },
     "main": "./release/node_biwascheme.js",
-    "files": [
-        "src/platforms/node/node_biwascheme.js",
-        "src/version.js",
-        "src/platforms/node/module_preamble.js",
-        "src/header.js",
-        "src/system/class.js",
-        "src/system/_writer.js",
-        "src/system/_types.js",
-        "src/system/error.js",
-        "src/system/set.js",
-        "src/system/values.js",
-        "src/system/pair.js",
-        "src/system/symbol.js",
-        "src/system/char.js",
-        "src/system/number.js",
-        "src/system/port.js",
-        "src/system/record.js",
-        "src/system/enumeration.js",
-        "src/system/hashtable.js",
-        "src/system/syntax.js",
-        "src/system/parser.js",
-        "src/system/compiler.js",
-        "src/system/pause.js",
-        "src/system/call.js",
-        "src/system/interpreter.js",
-        "src/system/promise.js",
-        "src/library/infra.js",
-        "src/library/r6rs_lib.js",
-        "src/library/js_interface.js",
-        "src/library/extra_lib.js",
-        "src/library/node_functions.js",
-        "src/library/srfi.js",
-        "src/platforms/node/module_postamble.js",
-        "bin/biwas"
-    ],
     "dependencies": {
         "optparse": "1.0.5",
-        "underscore": "1.2.2",
-        "underscore.string": "2.0.0"
+        "underscore": "1.9.1",
+        "underscore.string": "3.3.5"
     },
     "devDependencies": {
-        "express": "~4.10.4",
         "body-parser": ">0",
-        "marked": "~0.3.2",
-        "ejs": "~2.5.6",
-        "ejs-cli": "~2.0.0",
-        "uglifyjs": "~2.4.10",
-        "colors": "~0.6.2"
+        "express": "^4.17.1",
+        "marked": "^0.7.0",
+        "uglify-js": "^3.6.0"
     },
     "bin": {
         "biwas": "./bin/biwas"
     },
     "scripts": {
         "node-test": "node test/node_functions.js"
-    }
+    },
+    "files": [
+        "bin/biwas",
+        "release/node_biwascheme.js"
+    ]
 }

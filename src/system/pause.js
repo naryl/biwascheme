@@ -22,7 +22,7 @@ BiwaScheme.Pause = BiwaScheme.Class.create({
   },
 
   // Save state of expander
-  set_expander_state(expanding) {
+  set_expander_state: function(expanding) {
     this.expanding = expanding;
   },
 

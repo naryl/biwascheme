@@ -15,6 +15,8 @@ Registers:
   * Used by op_refer-free, op_assign-free
 * s [integer] : denotes stack size (TODO: can we remove this by using ary.push()/ary.pop()?)
 
+You can see how these registers work on [/test/tracer.html](https://www.biwascheme.org/test/tracer.html).
+
 Opecodes
 --------
 
@@ -152,7 +154,7 @@ Create Scheme closure object (which is represented with JS Array).
 #### format
 
 ```
-["close", <n>, <body>, <opecodes_next>, <dotpos>]
+["close", <args>, <n>, <body>, <opecodes_next>, <dotpos>]
 ```
 
 TODO: &lt;opecodes_next> should be the last in consistency with other opecodes
